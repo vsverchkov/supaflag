@@ -49,6 +49,7 @@ select delete_feature_flag('new_feature');
 
 ### Rollout strategy
 Rollout strategies let you activate a feature only for a specified users. Different strategies use different parameters.
+
 *Default - **global**.*
 > `feature_flag.strategy`
 
@@ -76,12 +77,14 @@ Use [`add_users_to_user_ids_feature_flag`](#functions) function to add user ids 
 ### Rollout percentage
 The percentage you want to activate the feature flag for.
 Works only with `random`, `stickiness_user_id` and `stickiness_session_id` strategies.
+
 *Default - **100** (rollout to all users).*
 > `feature_flag.percentage`
 
 ### Public policy
 Public policy allows you to make feature flags available only to `authenticated` users.
 See [Supabase Roles](https://supabase.com/docs/guides/database/postgres/roles#authenticator).
+
 *Default - **false** (visible only for authenticated).*
 > `feature_flag.public`
 
