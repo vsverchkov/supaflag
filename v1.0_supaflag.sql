@@ -305,3 +305,102 @@ flag_name - a name the feature flag; required;
 
 Results:
 void - when flag deleted (if you have do not have permisson operation will ingoring);';
+
+-- Create a function for checking feature multiple flag value
+create or replace function are_feature_flags_enabled(flag_names varchar[])
+returns table (
+    flag_name feature_flag.name%type,
+    flag_value feature_flag.value%type
+)
+language plpgsql
+set search_path = public
+as
+$$
+declare
+    feature_flag_row record;
+    uid uuid;
+    uid_percentage_by_hash smallint;
+    session_id uuid;
+    session_id_percentage_by_hash smallint;
+begin
+    for feature_flag_row in select  f.id, f.name, f.value, f.strategy, f.percentage
+                            from feature_flag f
+                            where f.name in (select unnest(flag_names))
+    loop
+        flag_name := feature_flag_row.name;
+        if feature_flag_row.strategy = 'global' then
+            flag_value := feature_flag_row.value;
+        elsif feature_flag_row.strategy = 'random' then
+            -- generate 1-100 range and check the inclusion in the configured percentage
+            flag_value :=   case when (select floor(random() * 100) + 1) <= feature_flag_row.percentage
+                            then feature_flag_row.value
+                            else not feature_flag_row.value end;
+        elsif feature_flag_row.strategy = 'stickiness_user_id' then
+            if uid_percentage_by_hash is not null then
+                flag_value :=   case when uid_percentage_by_hash <= feature_flag_row.percentage
+                                then feature_flag_row.value
+                                else not feature_flag_row.value end;
+                return next;
+                continue when flag_value is not null;
+            end if;
+
+            uid := (select auth.uid());
+            if uid is null then
+                flag_value := false;
+                return next;
+                continue when flag_value is not null;
+            end if;
+
+            uid_percentage_by_hash := (select ((uuid_hash(uid) + 2147483648) * 100 / 4294967295 + 1));
+            flag_value :=   case when uid_percentage_by_hash <= feature_flag_row.percentage
+                            then feature_flag_row.value
+                            else not feature_flag_row.value end;
+        elsif feature_flag_row.strategy = 'stickiness_session_id' then
+            if session_id_percentage_by_hash is not null then
+                flag_value :=   case when session_id_percentage_by_hash <= feature_flag_row.percentage
+                                then feature_flag_row.value
+                                else not feature_flag_row.value end;
+                return next;
+                continue when flag_value is not null;
+            end if;
+
+            session_id := (select (auth.jwt() ->> 'session_id'));
+            if session_id is null then
+                flag_value := false;
+                return next;
+                continue when flag_value is not null;
+            end if;
+
+            session_id_percentage_by_hash := (select ((uuid_hash(session_id) + 2147483648) * 100 / 4294967295 + 1));
+            flag_value :=   case when session_id_percentage_by_hash <= feature_flag_row.percentage
+                            then feature_flag_row.value
+                            else not feature_flag_row.value end;
+        elsif feature_flag_row.strategy = 'user_ids' then
+            uid := (select(auth.uid()));
+            if uid is null then
+                flag_value := false;
+                return next;
+                continue when flag_value is not null;
+            end if;
+
+            flag_value :=   case when exists(   select 1
+                                        from feature_flag_user_ids uis
+                                        where uis.flag_id = feature_flag_row.id and uis.user_id = uid)
+                            then feature_flag_row.value
+                            else not feature_flag_row.value end;
+        end if;
+        return next;
+    end loop;
+end;
+$$;
+
+-- Add comment on are_feature_flags_enabled function
+comment on function are_feature_flags_enabled is 'Get actual feature flags values.
+
+Parameters:
+flag_names - an array of the feature flag names; required;
+
+Results:
+table(flag_name, flag_value) - when returned the actual feature flag values;
+May be empty if flags are not found or there is no access to them;
+';

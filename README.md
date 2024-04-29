@@ -169,7 +169,7 @@ Results:
 - `void` when flag deleted (if you have do not have permisson operation will ingoring);
 
 #### Search path specification
-By default, `search_path = public` specified for each finction. If you want to use a diffferent schema for the feature flags, then specify this schema in search_path param for each finction.
+By default, `search_path = public` specified for each finction. If you want to use a diffferent schema for the feature flags, then specify this schema in search_path param for each function.
 
 
 ### Rollback
@@ -177,10 +177,11 @@ If you need to rollback the feature flag functionality, add [`v1.0_supaflag_roll
 
 
 ## Roadmap
-- [ ] Add scripted tests for stickness strategies;
 - [ ] Add `are_feature_flags_enabled` for getting a set of feature flags;
+- [ ] Add scripted tests for stickness strategies;
 - [ ] Add the ability to combine feature flags;
 - [ ] Add grouping for feature flags;
 - [ ] Add group id for stickiness strategies;
 - [ ] Add user-agent stickiness rollout strategy;
 - [ ] Add benchmarking for is_feature_flag_enabled() function;
+- [ ] Add an incrementally increase the rollout percentage daily (using pg_cron)
